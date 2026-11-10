@@ -1,6 +1,6 @@
 # City A · Polling Station Planner
 
-A single-page workspace for election staff. React and JavaScript render the interface, Tailwind and custom CSS provide a beige/black/white newspaper style, and a Python API stores accounts and plans in PostgreSQL.
+A single-page workspace for election staff with React, JavaScript, Tailwind, Python and PostgresSQL.
 
 ## Local development
 
@@ -64,47 +64,3 @@ The Compose database port is bound to localhost. The `poll` password is for deve
 - Adding or removing stations changes district boundaries. Existing stations are not removed because boundaries changed.
 - Saved plans validate finite in-range coordinates, unique station IDs and distinct locations. They are not replayed through historical insertion order, because a final plan does not record its editing history.
 - A maximum of 200 stations keeps the hand-written geometric calculation responsive. This is a planning prototype, not a geographic GIS application.
-
-## Geometry implementation
-
-No geometry or nearest-neighbor library implements the algorithm.
-
-Each station starts with the full square. For every other station, the Python implementation clips that polygon to the half-plane closer to the first station. The half-plane comes from expanding the squared Euclidean distances; their quadratic terms cancel to give a straight perpendicular bisector. Repeating the clipping produces a square-bounded Voronoi district, including collinear configurations without triangulation special cases.
-
-Queries scan squared distances and return all minima within a documented floating-point tolerance. The API returns the ordinary Euclidean distance. Tiny floating-point tolerances are necessary because noninteger coordinates cannot always be represented exactly in binary.
-
-## Verification
-
-Backend unit/API tests and frontend interaction tests live with their respective applications:
-
-```sh
-(cd backend && uv run pytest -q)
-(cd frontend && npm test -- --run)
-(cd frontend && npm run build)
-(cd backend && uv run python ../scripts/check_geometry.py)
-```
-
-For real-browser checks against the running frontend and API (including automated WCAG checks):
-
-```sh
-cd scripts
-npm ci
-npx playwright install chromium
-npm test
-```
-
-Browser screenshots are saved under `scripts/artifacts/`.
-
-With the API and actual PostgreSQL running, run this root-level integration check:
-
-```sh
-python3 scripts/smoke_test.py
-```
-
-It exercises district area coverage, boundary ties, invalid placement, account creation, cookie sessions, save/read/update, account isolation and persistence after logout/login. It deliberately creates two uniquely named QA accounts and a small saved plan; use a development database.
-
-## Deployment considerations
-
-This is an implemented local application, not a certification of production election security. Before public deployment, configure HTTPS and secure session cookies, use unique database credentials, add deployment-appropriate login throttling and account provisioning, set trusted origins and establish backups and operational monitoring. Account creation does not by itself verify that someone is an election official. Do not expose public registration for real election operations without an approval policy.
-
-No demographic data, voting records or real city geography are included. Station names and coordinates are the planning data.
