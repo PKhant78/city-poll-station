@@ -1,0 +1,33 @@
+const { test, expect } = require('@playwright/test');
+const AxeBuilder = require('@axe-core/playwright').default;
+
+test('official can register, save to PostgreSQL and load after browser refresh', async ({ page }) => {
+  page.on('dialog', dialog => dialog.accept());
+  await page.goto(process.env.APP_URL || 'http://127.0.0.1:5180');
+  await page.getByRole('button', { name: 'Account / Sign in' }).click();
+  await page.getByRole('button', { name: 'Create account', exact: true }).click();
+  await page.getByLabel('Email', { exact: true }).fill(`browser-qa-${Date.now()}@example.com`);
+  await page.getByLabel('Password', { exact: true }).fill('Browser-QA-password-2026!');
+  const report = await new AxeBuilder({ page }).withTags(['wcag2a', 'wcag2aa', 'wcag21aa']).analyze();
+  if (report.violations.length) console.log(JSON.stringify(report.violations.map(v => ({ id: v.id, nodes: v.nodes.map(n => ({ target: n.target, summary: n.failureSummary })) })), null, 2));
+  expect(report.violations.map(v => v.id)).toEqual([]);
+  await page.getByRole('button', { name: 'Register', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Log out', exact: true })).toBeVisible();
+  await page.getByLabel('Station label', { exact: true }).fill('Civic Library');
+  await page.getByLabel('Station X', { exact: true }).fill('12.5');
+  await page.getByLabel('Station Y', { exact: true }).fill('87.5');
+  await page.getByRole('button', { name: 'Add station', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Remove Civic Library' })).toBeVisible();
+  await page.getByLabel('Plan name', { exact: true }).fill('Browser QA plan');
+  await page.getByRole('button', { name: 'Save plan', exact: true }).click();
+  await expect(page.getByText('All changes saved', { exact: true })).toBeVisible();
+  await page.reload();
+  await expect(page.getByRole('button', { name: 'Log out', exact: true })).toBeVisible();
+  await expect(page.getByRole('option', { name: 'Browser QA plan', exact: true })).toBeAttached();
+  await page.getByRole('combobox', { name: 'Saved plans', exact: true }).selectOption({ label: 'Browser QA plan' });
+  await page.getByRole('button', { name: 'Load plan', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Remove Civic Library' })).toBeVisible();
+  await expect(page.getByLabel('Plan name', { exact: true })).toHaveValue('Browser QA plan');
+  await page.getByRole('button', { name: 'Log out', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Account / Sign in' })).toBeVisible();
+});

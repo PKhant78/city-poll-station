@@ -1,0 +1,12 @@
+node_modules/
+dist/
+playwright-report/
+test-results/
+scripts/artifacts/
+.DS_Store
+.venv/
+__pycache__/
+.pytest_cache/
+*.pyc
+.env
+*.db
