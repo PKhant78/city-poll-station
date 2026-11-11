@@ -34,7 +34,9 @@ it("starts empty and validates before adding a coordinate station, then removes 
   );
   render(<App />);
   expect(screen.getByText("No stations placed yet.")).toBeInTheDocument();
+  expect(document.querySelector(".station-count")).toHaveTextContent(/^0 stations$/);
   const u = await addStation();
+  expect(document.querySelector(".station-count")).toHaveTextContent(/^1 station$/);
   expect(
     await screen.findByRole("button", { name: "Remove Central" }),
   ).toBeInTheDocument();

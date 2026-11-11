@@ -177,7 +177,8 @@ export default function App() {
   const authEpoch = useRef(0),
     revision = useRef(0),
     queryEpoch = useRef(0),
-    svgRef = useRef(null);
+    svgRef = useRef(null),
+    importedGeometry = useRef(null);
   const dirty = saved !== snapshot(stations, show, name);
   function changeStations(next) {
     revision.current++;
@@ -234,6 +235,7 @@ export default function App() {
   useEffect(() => {
     let active = true;
     const rev = revision.current;
+    if (importedGeometry.current === stations) return;
     api("/geometry", { stations })
       .then((d) => {
         if (active && rev === revision.current) setDistricts(d.districts);
@@ -478,7 +480,6 @@ export default function App() {
       </header>
       <div className="edition-bar">
         <span>City district planner</span>
-        <span>Euclidean distance · 100 × 100 units</span>
       </div>
       {error && !authOpen && (
         <p role="alert" className="error">
@@ -492,11 +493,10 @@ export default function App() {
         <section className="map-panel" aria-labelledby="map-heading">
           <div className="section-heading">
             <div>
-              <span className="eyebrow">01 / The city</span>
               <h2 id="map-heading">Map of City A</h2>
             </div>
             <span className="station-count">
-              {stations.length} / 200 stations
+              {stations.length} {stations.length === 1 ? "station" : "stations"}
             </span>
           </div>
           <div className="map-frame">
@@ -661,7 +661,6 @@ export default function App() {
           <section className="tool-section">
             <div className="section-heading">
               <div>
-                <span className="eyebrow">02 / Place</span>
                 <h2>Add a station</h2>
               </div>
             </div>
@@ -745,7 +744,6 @@ export default function App() {
             </div>
           </section>
           <section className="tool-section">
-            <span className="eyebrow">03 / Locate</span>
             <h2>Find the nearest</h2>
             <p className="help">
               Test a point. Equal distances return every tied station.
@@ -802,7 +800,6 @@ export default function App() {
       </div>
       <section className="plans-panel" aria-labelledby="plans-heading">
         <div className="plan-intro">
-          <span className="eyebrow">04 / Keep</span>
           <h2 id="plans-heading">Your plans</h2>
           <p className="save-state">
             {dirty ? "Unsaved changes" : "All changes saved"}

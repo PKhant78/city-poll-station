@@ -12,6 +12,24 @@ beforeEach(() => {
       : response({ districts: [] }),
   );
 });
+it("omits numbered section subtitles and the Euclidean-distance subtitle", () => {
+  render(<App />);
+  for (const subtitle of [
+    "01 / The city",
+    "02 / Place",
+    "03 / Locate",
+    "04 / Keep",
+    "Euclidean distance · 100 × 100 units",
+  ]) {
+    expect(screen.queryByText(subtitle)).not.toBeInTheDocument();
+  }
+  expect(
+    screen.getByRole("heading", { name: "Map of City A" }),
+  ).toBeInTheDocument();
+  expect(
+    screen.getByRole("heading", { name: "Add a station" }),
+  ).toBeInTheDocument();
+});
 it("has a working styled application entry and map export controls", () => {
   expect(existsSync("index.html")).toBe(true);
   expect(readFileSync("src/main.jsx", "utf8")).toContain("createRoot");
