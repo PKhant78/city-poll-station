@@ -56,6 +56,23 @@ The Compose database port is bound to localhost. The `poll` password is for deve
 5. Create an account or sign in to save a named plan. Successful registration, login and logout reset the working map: stations, districts, query results, plan name and association are cleared, with a clean saved-change baseline. Failed authentication preserves your draft. Saved plans remain in your account; load a saved plan to restore its stations and district visibility.
 6. Download the map as PNG or export station coordinates as CSV.
 
+### Importing station CSV files
+
+Use **Import CSV** beside the map export controls. Choose a `.csv` file (extension is case-insensitive; MIME type does not matter), at most 1 MiB (1,048,576 bytes), containing 1–200 stations. The file is read locally, not uploaded or stored as a file. Parsed station data is sent to the geometry API for validation and district calculation; it is only persisted when you explicitly save a plan.
+
+Required headers are `x,y`; optional headers are `id` and either `name` or `label`. Header order is flexible and headers are trimmed and case-insensitive. Unknown, repeated or missing headers and semicolon/tab delimiters are rejected. The existing `id,name,x,y` CSV export is supported. For example:
+
+```csv
+name,x,y
+West Hall,25.25,50
+East Hall,74.75,50
+Center,50,20
+```
+
+See [`examples/stations.csv`](examples/stations.csv) for a ready-to-import file. Without IDs or names, rows receive `station-1` / `Station 1`, etc. Explicit IDs/names must be nonblank and at most 100 characters. Coordinates must be finite decimal numbers in `[0,100]`; blanks, hexadecimal, NaN and infinity are rejected. Duplicate IDs or coordinates are rejected. CSV quoting, escaped double quotes, quoted line breaks, CRLF, UTF-8 BOM and empty trailing lines are supported. Text is trimmed; spreadsheet-safety apostrophes from exported text remain literal and are not silently removed.
+
+The complete final set is validated together, not replayed as sequential station insertions. A valid import replaces the working stations, shows all districts, clears the previous query and plan association/name, and marks the new draft unsaved. An unsaved nonempty draft requires confirmation before replacement. Invalid files report a visible error (coordinate errors include the physical row number) and leave the existing map unchanged, with no partial import. Editing and plan saves are disabled while importing; authentication changes invalidate an in-flight import.
+
 ### Coordinate and boundary rules
 
 - The city is the closed square `[0,100] × [0,100]`; its outer edges are valid locations.
