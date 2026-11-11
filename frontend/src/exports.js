@@ -1,3 +1,5 @@
+import { INITIAL_VIEW, viewBox } from "./mapViewport";
+
 const cell = (value) => {
   let text = String(value);
   if (/^[=+\-@\t\r]/.test(text)) text = "'" + text;
@@ -26,6 +28,7 @@ export function download(blob, filename) {
 }
 export async function exportPNG(svg) {
   const clone = svg.cloneNode(true);
+  clone.setAttribute("viewBox", viewBox(INITIAL_VIEW));
   clone.setAttribute("xmlns", "http://www.w3.org/2000/svg");
   clone.setAttribute("width", "1600");
   clone.setAttribute("height", "1600");

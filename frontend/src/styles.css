@@ -256,6 +256,7 @@ h3 {
 }
 .map-toolbar {
   display: flex;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 15px;
   align-items: center;
@@ -280,6 +281,28 @@ h3 {
   display: flex;
   gap: 8px;
   flex-wrap: wrap;
+}
+.map-display-controls,
+.map-view-controls {
+  align-items: center;
+}
+.map-view-controls {
+  margin: 14px 0 8px;
+}
+.cursor-coordinates {
+  position: absolute;
+  z-index: 1;
+  pointer-events: none;
+  padding: 5px 8px;
+  border: 1px solid var(--ink);
+  background: var(--paper, #fffefa);
+  box-sizing: border-box;
+  font: 12px monospace;
+  color: var(--ink);
+}
+.map-display-controls button[aria-pressed="true"] {
+  background: var(--ink);
+  color: var(--paper);
 }
 .map-note {
   font-size: 12px;

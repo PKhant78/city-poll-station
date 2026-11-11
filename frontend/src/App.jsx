@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from "react";
 import { download, exportPNG, stationsCSV } from "./exports";
 import { parseStationsCSV } from "./imports";
+import { useMapViewport } from "./useMapViewport";
 export async function api(path, body, method = "POST") {
   const res = await fetch("/api" + path, {
     method,
@@ -179,8 +180,10 @@ export default function App() {
     queryEpoch = useRef(0),
     svgRef = useRef(null),
     importedGeometry = useRef(null);
+  const mapView = useMapViewport(svgRef);
   const dirty = saved !== snapshot(stations, show, name);
   function changeStations(next) {
+    mapView.reset();
     revision.current++;
     queryEpoch.current++;
     setStations(next);
@@ -502,13 +505,10 @@ export default function App() {
           <div className="map-frame">
             <svg
               ref={svgRef}
-              viewBox="-8 -8 116 116"
+              {...mapView.svgProps}
               role="img"
               aria-label="City planning map"
             >
-              <title>
-                Square city map. X increases right; Y increases upward.
-              </title>
               <rect x="-8" y="-8" width="116" height="116" fill="#f5f2e9" />
               <rect width="100" height="100" fill="#fffefa" />
               {ticks.map((t) => (
@@ -605,6 +605,16 @@ export default function App() {
                 N ↑
               </text>
             </svg>
+            {mapView.showCoordinates && mapView.hasPointer && (
+              <output
+                ref={mapView.readoutRef}
+                className="cursor-coordinates"
+                aria-label="Cursor coordinates"
+                aria-live="off"
+              >
+                {mapView.readout}
+              </output>
+            )}
             {!stations.length && (
               <div className="map-empty" aria-hidden="true">
                 <span className="empty-cross">+</span>
@@ -614,14 +624,20 @@ export default function App() {
             )}
           </div>
           <div className="map-toolbar">
-            <label className="checkbox-label">
-              <input
-                type="checkbox"
-                checked={show}
-                onChange={(e) => setShow(e.target.checked)}
-              />
-              Draw districts
-            </label>
+            <div className="button-row map-display-controls">
+              <button
+                aria-pressed={show}
+                onClick={() => setShow((value) => !value)}
+              >
+                Draw districts
+              </button>
+              <button
+                aria-pressed={mapView.showCoordinates}
+                onClick={mapView.toggleCoordinates}
+              >
+                Show cursor coordinates
+              </button>
+            </div>
             <div className="button-row">
               <label className="csv-import">
                 Import CSV
@@ -652,6 +668,30 @@ export default function App() {
               </button>
             </div>
           </div>
+          <div
+            className="button-row map-view-controls"
+            aria-label="Map view controls"
+          >
+            <button
+              aria-label="Zoom in"
+              onClick={mapView.zoomIn}
+              disabled={mapView.atMaximum}
+            >
+              +
+            </button>
+            <button
+              aria-label="Zoom out"
+              onClick={mapView.zoomOut}
+              disabled={mapView.atMinimum}
+            >
+              −
+            </button>
+            <button onClick={mapView.reset}>Reset view</button>
+          </div>
+          <p id="map-view-help" className="help">
+            Zoom in to drag the map. Focus the map and use arrow keys to pan.
+            PNG exports always show the full city.
+          </p>
           <p className="map-note">
             A district contains every point closest to its station. Shared edges
             mark equal distances. City perimeter points are welcome.
