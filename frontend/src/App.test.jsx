@@ -81,7 +81,7 @@ it("announces out-of-range coordinates and server validation without adding stat
   );
   expect(screen.getByText("No stations placed yet.")).toBeInTheDocument();
 });
-it("registers an account, saves and loads a named plan, then logs out without losing work", async () => {
+it("registers an account, saves and loads a named plan, then logs out to a clean map", async () => {
   const saved = {
     id: "plan-1",
     name: "Election day",
@@ -120,7 +120,8 @@ it("registers an account, saves and loads a named plan, then logs out without lo
   expect(
     await screen.findByRole("button", { name: "Account / Sign in" }),
   ).toBeInTheDocument();
-  expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+  expect(screen.getByText("All changes saved")).toBeInTheDocument();
+  expect(screen.getByLabelText("Plan name")).toHaveValue("");
 });
 it("renders computed districts and reports every nearest-station tie", async () => {
   fetch.mockImplementation((url, options) => {

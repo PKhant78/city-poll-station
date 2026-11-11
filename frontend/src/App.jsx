@@ -105,7 +105,9 @@ function AccountDialog({
       <h2 id="account-title">
         {register ? "Create your account" : "Welcome back"}
       </h2>
-      <p>Keep your city plans together. Your working map stays right here.</p>
+      <p>
+        Keep your city plans together. Signing in starts a fresh working map.
+      </p>
       <div className="button-row auth-tabs">
         <button
           aria-pressed={!register}
@@ -183,6 +185,16 @@ export default function App() {
     setDistricts([]);
     setQuerying(false);
   }
+  function resetWorkingMap() {
+    changeStations([]);
+    setAdding(false);
+    setPlans([]);
+    setName("");
+    setPlanId(null);
+    setSelection("");
+    setShow(true);
+    setSaved(snapshot([], true, ""));
+  }
   useEffect(() => {
     let active = true;
     const epoch = authEpoch.current;
@@ -219,12 +231,13 @@ export default function App() {
   }, [user]);
   useEffect(() => {
     let active = true;
+    const rev = revision.current;
     api("/geometry", { stations })
       .then((d) => {
-        if (active) setDistricts(d.districts);
+        if (active && rev === revision.current) setDistricts(d.districts);
       })
       .catch((e) => {
-        if (active) setError(e.message);
+        if (active && rev === revision.current) setError(e.message);
       });
     return () => {
       active = false;
@@ -290,9 +303,9 @@ export default function App() {
         password: f.get("password"),
       });
       setUser(d.user);
-      setSaved(null);
+      resetWorkingMap();
       setAuthOpen(false);
-      setStatus("Signed in. Your working map is unchanged.");
+      setStatus("Signed in. Your working map has been reset.");
     } catch (e) {
       setError(e.message);
     } finally {
@@ -307,11 +320,8 @@ export default function App() {
     try {
       await api("/auth/logout", {});
       setUser(null);
-      setPlans([]);
-      setPlanId(null);
-      setSelection("");
-      setSaved(null);
-      setStatus("Signed out. Your working map is still here.");
+      resetWorkingMap();
+      setStatus("Signed out. Your working map has been reset.");
     } catch (e) {
       setError(e.message);
     } finally {
@@ -398,7 +408,7 @@ export default function App() {
     <main className="app-shell">
       <header className="masthead">
         <div>
-          <p className="eyebrow">Civic planning / A spatial field tool</p>
+          <p className="eyebrow">The Board of Elections of City A</p>
           <h1>
             The Polling Atlas<span className="title-period">.</span>
           </h1>
@@ -440,7 +450,7 @@ export default function App() {
           <div className="section-heading">
             <div>
               <span className="eyebrow">01 / The city</span>
-              <h2 id="map-heading">Every station has its place.</h2>
+              <h2 id="map-heading">Map of City A</h2>
             </div>
             <span className="station-count">
               {stations.length} / 200 stations

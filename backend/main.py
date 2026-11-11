@@ -105,7 +105,9 @@ def create_app(database_url=None):
     @application.post('/api/auth/login')
     def login(body: Credentials, response: Response, db=Depends(get_db)):
         user = db.scalar(select(User).where(User.email == body.email))
-        if user is None or not verify_password(body.password, user.password_hash):
+        if user is None:
+            raise HTTPException(401, 'Unknown email.')
+        if not verify_password(body.password, user.password_hash):
             raise HTTPException(401, 'Invalid email or password.')
         return start_session(user, response, db)
 

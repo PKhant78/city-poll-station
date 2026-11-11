@@ -101,6 +101,19 @@ def test_login_logout_expiry_and_restart(tmp_path):
         assert second.get('/api/auth/me').status_code == 401
 
 
+def test_unknown_email_has_a_distinct_login_error(client):
+    credentials = {'email': 'alice@example.com', 'password': 'password123'}
+    assert client.post('/api/auth/register', json=credentials).status_code == 201
+    client.post('/api/auth/logout')
+    unknown = client.post('/api/auth/login', json={**credentials, 'email': 'unknown@example.com'})
+    assert unknown.status_code == 401
+    assert unknown.json() == {'detail': 'Unknown email.'}
+    wrong_password = client.post('/api/auth/login', json={**credentials, 'password': 'wrongpass'})
+    assert wrong_password.status_code == 401
+    assert wrong_password.json()['detail'] != unknown.json()['detail']
+    assert client.get('/api/auth/me').status_code == 401
+
+
 def test_duplicate_registration_and_bad_credentials(client):
     credentials = {'email':'alice@example.com','password':'password123'}
     assert client.post('/api/auth/register',json=credentials).status_code == 201

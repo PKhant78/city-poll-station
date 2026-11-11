@@ -53,7 +53,7 @@ The Compose database port is bound to localhost. The `poll` password is for deve
 2. Add stations by entering their names and coordinates. Decimal coordinates are accepted.
 3. Draw districts to show black boundaries around each station's nearest-point region. Removing or adding a station updates the subdivision.
 4. Query a coordinate to find its nearest station. A boundary query returns **all** tied stations, including three-way or higher-order junctions.
-5. Create an account or sign in to save a named plan. Load a saved plan to restore its stations and district visibility.
+5. Create an account or sign in to save a named plan. Successful registration, login and logout reset the working map: stations, districts, query results, plan name and association are cleared, with a clean saved-change baseline. Failed authentication preserves your draft. Saved plans remain in your account; load a saved plan to restore its stations and district visibility.
 6. Download the map as PNG or export station coordinates as CSV.
 
 ### Coordinate and boundary rules
