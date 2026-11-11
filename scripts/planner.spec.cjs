@@ -38,7 +38,7 @@ test('real API map, boundary rejection, tie query, removal and accessibility', a
   expect(report.violations.map(v => `${v.id}: ${v.description}`)).toEqual([]);
   await page.screenshot({ path: path.join(__dirname, 'artifacts', 'planner-desktop.png'), fullPage: true });
   const csvEvent = page.waitForEvent('download');
-  await page.getByRole('button', { name: /CSV/i }).click();
+  await page.getByRole('button', { name: 'Export CSV', exact: true }).click();
   const csv = await csvEvent;
   const csvText = await fs.readFile(await csv.path(), 'utf8');
   expect(csvText).toContain('West Hall');

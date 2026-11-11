@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from "react";
 import { download, exportPNG, stationsCSV } from "./exports";
+import { parseStationsCSV } from "./imports";
 export async function api(path, body, method = "POST") {
   const res = await fetch("/api" + path, {
     method,
@@ -171,7 +172,8 @@ export default function App() {
     [planBusy, setPlanBusy] = useState(false),
     [saved, setSaved] = useState(null),
     [status, setStatus] = useState(""),
-    [exporting, setExporting] = useState(false);
+    [exporting, setExporting] = useState(false),
+    [importing, setImporting] = useState(false);
   const authEpoch = useRef(0),
     revision = useRef(0),
     queryEpoch = useRef(0),
@@ -243,6 +245,47 @@ export default function App() {
       active = false;
     };
   }, [stations]);
+  async function importCSV(e) {
+    const file = e.target.files?.[0];
+    e.target.value = ""; // Allow retrying the same file after any outcome.
+    if (!file || importing || adding || planBusy || authBusy) return;
+    const rev = revision.current,
+      epoch = authEpoch.current;
+    const current = () =>
+      rev === revision.current && epoch === authEpoch.current;
+    setImporting(true);
+    setError("");
+    setStatus("");
+    try {
+      if (!/\.csv$/i.test(file.name)) throw new Error("choose a CSV file.");
+      if (file.size > 1024 * 1024)
+        throw new Error("CSV files must be 1 MB or smaller.");
+      const text = await new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(reader.result);
+        reader.onerror = () =>
+          reject(new Error("The CSV file could not be read."));
+        reader.readAsText(file);
+      });
+      if (!current()) return;
+      const next = parseStationsCSV(text);
+      const data = await api("/geometry", { stations: next });
+      if (!current() || !canDiscard()) return;
+      importedGeometry.current = next;
+      changeStations(next);
+      setDistricts(data.districts);
+      setShow(true);
+      setName("");
+      setPlanId(null);
+      setSelection("");
+      setSaved(null);
+      setStatus(`Imported ${next.length} stations. Districts updated.`);
+    } catch (error) {
+      if (current()) setError(`Error uploading file: ${error.message}`);
+    } finally {
+      setImporting(false);
+    }
+  }
   async function add(e) {
     e.preventDefault();
     const form = e.currentTarget,
@@ -580,6 +623,17 @@ export default function App() {
               Draw districts
             </label>
             <div className="button-row">
+              <label className="csv-import">
+                Import CSV
+                <input
+                  type="file"
+                  accept=".csv,text/csv"
+                  aria-label="Import CSV"
+                  disabled={importing || adding || planBusy || authBusy}
+                  onChange={importCSV}
+                />
+              </label>
+              {importing && <span role="status">Importing…</span>}
               <button onClick={png} disabled={exporting}>
                 {exporting ? "Exporting…" : "Export PNG"}
               </button>
@@ -650,7 +704,10 @@ export default function App() {
                   />
                 </label>
               </div>
-              <button className="primary" disabled={adding || planBusy}>
+              <button
+                className="primary"
+                disabled={adding || planBusy || importing}
+              >
                 {adding ? "Checking location…" : "Add station"}
               </button>
             </form>
@@ -675,7 +732,7 @@ export default function App() {
                     </div>
                     <button
                       aria-label={`Remove ${s.name}`}
-                      disabled={adding || planBusy}
+                      disabled={adding || planBusy || importing}
                       onClick={() =>
                         changeStations(stations.filter((x) => x.id !== s.id))
                       }
@@ -769,18 +826,21 @@ export default function App() {
           <div className="button-row">
             <button
               className="primary"
-              disabled={planBusy || authBusy || adding}
+              disabled={planBusy || authBusy || adding || importing}
               onClick={() => save()}
             >
               Save plan
             </button>
             <button
-              disabled={!planId || planBusy || authBusy || adding}
+              disabled={!planId || planBusy || authBusy || adding || importing}
               onClick={() => save(true)}
             >
               Save as new
             </button>
-            <button disabled={planBusy || adding} onClick={newPlan}>
+            <button
+              disabled={planBusy || adding || importing}
+              onClick={newPlan}
+            >
               New plan
             </button>
           </div>
@@ -800,7 +860,10 @@ export default function App() {
               ))}
             </select>
           </label>
-          <button disabled={!selection || planBusy || adding} onClick={load}>
+          <button
+            disabled={!selection || planBusy || adding || importing}
+            onClick={load}
+          >
             Load plan
           </button>
         </div>
