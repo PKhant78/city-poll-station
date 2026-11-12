@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from "react";
 import { download, exportPNG, stationsCSV } from "./exports";
 import { parseStationsCSV } from "./imports";
 import { useMapViewport } from "./useMapViewport";
+import { useMapFit } from "./useMapFit";
 export async function api(path, body, method = "POST") {
   const res = await fetch("/api" + path, {
     method,
@@ -157,6 +158,10 @@ function AccountDialog({
 export default function App() {
   const [stations, setStations] = useState([]),
     [error, setError] = useState(""),
+    [queryError, setQueryError] = useState(""),
+    [queryCoordinates, setQueryCoordinates] = useState({ x: "", y: "" }),
+    [selectedStationId, setSelectedStationId] = useState(null),
+    [stationDraft, setStationDraft] = useState({ name: "", x: "", y: "" }),
     [adding, setAdding] = useState(false),
     [districts, setDistricts] = useState([]),
     [show, setShow] = useState(true),
@@ -178,16 +183,44 @@ export default function App() {
   const authEpoch = useRef(0),
     revision = useRef(0),
     queryEpoch = useRef(0),
+    mapFrameRef = useRef(null),
     svgRef = useRef(null),
     importedGeometry = useRef(null);
   const mapView = useMapViewport(svgRef);
+  const mapFitStyle = useMapFit(mapFrameRef);
   const dirty = saved !== snapshot(stations, show, name);
+  const stationBusy = adding || planBusy || importing || authBusy;
+  function clearStationSelection() {
+    setSelectedStationId(null);
+    setStationDraft({ name: "", x: "", y: "" });
+  }
+  function selectStation(station) {
+    if (stationBusy) return;
+    setSelectedStationId(station.id);
+    setStationDraft({
+      name: station.name,
+      x: String(station.x),
+      y: String(station.y),
+    });
+    setError("");
+    setStatus(
+      `Selected ${station.name}. Edit its fields or delete the station.`,
+    );
+  }
+  function removeStation(id) {
+    if (stationBusy) return;
+    changeStations(stations.filter((station) => station.id !== id));
+    setError("");
+    setStatus("Station deleted. Districts updated.");
+  }
   function changeStations(next) {
+    clearStationSelection();
     mapView.reset();
     revision.current++;
     queryEpoch.current++;
     setStations(next);
     setResult(null);
+    setQueryError("");
     setDistricts([]);
     setQuerying(false);
   }
@@ -291,10 +324,10 @@ export default function App() {
       setImporting(false);
     }
   }
-  async function add(e) {
+  async function saveStation(e) {
     e.preventDefault();
-    const form = e.currentTarget,
-      f = new FormData(form),
+    if (stationBusy) return;
+    const f = new FormData(e.currentTarget),
       rev = revision.current;
     setAdding(true);
     setError("");
@@ -302,16 +335,34 @@ export default function App() {
       const { x, y } = coordinates(f),
         label = String(f.get("name")).trim();
       if (!label) throw new Error("Enter a station label.");
-      if (stations.length >= 200)
+      const edited = stations.find(
+        (station) => station.id === selectedStationId,
+      );
+      if (!edited && stations.length >= 200)
         throw new Error("The plan can contain at most 200 stations.");
-      await api("/validate-station", { stations, x, y });
+      if (!edited || edited.x !== x || edited.y !== y) {
+        await api("/validate-station", {
+          stations: stations.filter((station) => station.id !== edited?.id),
+          x,
+          y,
+        });
+      }
       if (rev !== revision.current) return;
-      changeStations([
-        ...stations,
-        { id: crypto.randomUUID(), name: label, x, y },
-      ]);
-      form.reset();
-      setStatus("Station added. Districts updated.");
+      changeStations(
+        edited
+          ? stations.map((station) =>
+              station.id === edited.id
+                ? { ...station, name: label, x, y }
+                : station,
+            )
+          : [...stations, { id: crypto.randomUUID(), name: label, x, y }],
+      );
+
+      setStatus(
+        edited
+          ? "Station updated. Districts updated."
+          : "Station added. Districts updated.",
+      );
     } catch (e) {
       if (rev === revision.current) setError(e.message);
     } finally {
@@ -324,6 +375,7 @@ export default function App() {
       epoch = ++queryEpoch.current,
       rev = revision.current;
     setError("");
+    setQueryError("");
     setResult(null);
     try {
       const point = coordinates(f);
@@ -334,10 +386,18 @@ export default function App() {
       if (epoch === queryEpoch.current && rev === revision.current)
         setResult({ ...d, point });
     } catch (e) {
-      if (epoch === queryEpoch.current) setError(e.message);
+      if (epoch === queryEpoch.current) setQueryError(e.message);
     } finally {
       if (epoch === queryEpoch.current) setQuerying(false);
     }
+  }
+  function resetQuery() {
+    queryEpoch.current++;
+    setQueryCoordinates({ x: "", y: "" });
+    setResult(null);
+    setQueryError("");
+    setQuerying(false);
+    setStatus("Query reset.");
   }
   async function authenticate(e) {
     e.preventDefault();
@@ -386,11 +446,25 @@ export default function App() {
       setError("Enter a plan name before saving.");
       return;
     }
+    const id = asNew ? null : planId;
+    if (
+      plans.some(
+        (plan) =>
+          plan.id !== id &&
+          plan.name.trim().toLowerCase() === name.trim().toLowerCase(),
+      )
+    ) {
+      setStatus("");
+      setError(
+        "A plan with this name already exists. Choose a different name.",
+      );
+      return;
+    }
     setPlanBusy(true);
     setError("");
+    setStatus("");
     const before = snapshot(stations, show, name),
-      epoch = authEpoch.current,
-      id = asNew ? null : planId;
+      epoch = authEpoch.current;
     try {
       const d = await api(
         id ? `/plans/${id}` : "/plans",
@@ -482,11 +556,11 @@ export default function App() {
         </div>
       </header>
       <div className="edition-bar">
-        <span>City district planner</span>
+        <span>Voting Districts Planner</span>
       </div>
-      {error && !authOpen && (
+      {(error || queryError) && !authOpen && (
         <p role="alert" className="error">
-          {error}
+          {error || queryError}
         </p>
       )}
       <p role="status" className="status">
@@ -502,7 +576,7 @@ export default function App() {
               {stations.length} {stations.length === 1 ? "station" : "stations"}
             </span>
           </div>
-          <div className="map-frame">
+          <div className="map-frame" ref={mapFrameRef} style={mapFitStyle}>
             <svg
               ref={svgRef}
               {...mapView.svgProps}
@@ -563,7 +637,35 @@ export default function App() {
                 strokeWidth=".45"
               />
               {stations.map((s) => (
-                <g key={s.id}>
+                <g
+                  key={s.id}
+                  className="station-marker"
+                  role="button"
+                  aria-label={`Select station ${s.name}`}
+                  aria-pressed={selectedStationId === s.id}
+                  aria-disabled={stationBusy}
+                  tabIndex={stationBusy ? -1 : 0}
+                  onPointerDown={(event) => event.stopPropagation()}
+                  onClick={() => selectStation(s)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter" || event.key === " ") {
+                      event.preventDefault();
+                      event.stopPropagation();
+                      selectStation(s);
+                    }
+                  }}
+                >
+                  <circle cx={s.x} cy={100 - s.y} r="2.8" fill="transparent" />
+                  {selectedStationId === s.id && (
+                    <circle
+                      cx={s.x}
+                      cy={100 - s.y}
+                      r="2"
+                      fill="none"
+                      stroke="#181816"
+                      strokeWidth=".3"
+                    />
+                  )}
                   <circle
                     cx={s.x}
                     cy={100 - s.y}
@@ -588,7 +690,12 @@ export default function App() {
                 </g>
               ))}
               {result && (
-                <g stroke="#181816" strokeWidth=".4">
+                <g
+                  role="img"
+                  aria-label="Query location"
+                  stroke="#181816"
+                  strokeWidth=".4"
+                >
                   <path
                     d={`M ${result.point.x - 1.2} ${100 - result.point.y} h 2.4 M ${result.point.x} ${98.8 - result.point.y} v 2.4`}
                   />
@@ -638,7 +745,7 @@ export default function App() {
                 Show cursor coordinates
               </button>
             </div>
-            <div className="button-row">
+            <div className="button-row file-actions">
               <label className="csv-import">
                 Import CSV
                 <input
@@ -649,7 +756,6 @@ export default function App() {
                   onChange={importCSV}
                 />
               </label>
-              {importing && <span role="status">Importing…</span>}
               <button onClick={png} disabled={exporting}>
                 {exporting ? "Exporting…" : "Export PNG"}
               </button>
@@ -666,6 +772,7 @@ export default function App() {
               >
                 Export CSV
               </button>
+              {importing && <span role="status">Importing…</span>}
             </div>
           </div>
           <div
@@ -689,8 +796,9 @@ export default function App() {
             <button onClick={mapView.reset}>Reset view</button>
           </div>
           <p id="map-view-help" className="help">
-            Zoom in to drag the map. Focus the map and use arrow keys to pan.
-            PNG exports always show the full city.
+            Select a station to edit or delete it. Zoom in to drag the map.
+            Focus the map and use arrow keys to pan. PNG exports always show the
+            full city.
           </p>
           <p className="map-note">
             A district contains every point closest to its station. Shared edges
@@ -701,17 +809,27 @@ export default function App() {
           <section className="tool-section">
             <div className="section-heading">
               <div>
-                <h2>Add a station</h2>
+                <h2>{selectedStationId ? "Edit station" : "Add a station"}</h2>
               </div>
             </div>
             <p className="help">
-              Choose a name and coordinates within the city.
+              {selectedStationId
+                ? "Update the selected station, or delete it from the map."
+                : "Choose a name and coordinates within the city."}
             </p>
-            <form noValidate onSubmit={add}>
+            <form noValidate onSubmit={saveStation}>
               <label>
                 Station label
                 <input
                   name="name"
+                  value={stationDraft.name}
+                  onChange={(event) =>
+                    setStationDraft((draft) => ({
+                      ...draft,
+                      name: event.target.value,
+                    }))
+                  }
+                  disabled={stationBusy}
                   required
                   maxLength="100"
                   placeholder="e.g. Central library"
@@ -722,6 +840,14 @@ export default function App() {
                   Station X
                   <input
                     name="x"
+                    value={stationDraft.x}
+                    onChange={(event) =>
+                      setStationDraft((draft) => ({
+                        ...draft,
+                        x: event.target.value,
+                      }))
+                    }
+                    disabled={stationBusy}
                     type="number"
                     required
                     min="0"
@@ -734,6 +860,14 @@ export default function App() {
                   Station Y
                   <input
                     name="y"
+                    value={stationDraft.y}
+                    onChange={(event) =>
+                      setStationDraft((draft) => ({
+                        ...draft,
+                        y: event.target.value,
+                      }))
+                    }
+                    disabled={stationBusy}
                     type="number"
                     required
                     min="0"
@@ -743,12 +877,35 @@ export default function App() {
                   />
                 </label>
               </div>
-              <button
-                className="primary"
-                disabled={adding || planBusy || importing}
-              >
-                {adding ? "Checking location…" : "Add station"}
+              <button className="primary" disabled={stationBusy}>
+                {adding
+                  ? "Checking location…"
+                  : selectedStationId
+                    ? "Save changes"
+                    : "Add station"}
               </button>
+              {selectedStationId && (
+                <div className="button-row station-edit-actions">
+                  <button
+                    type="button"
+                    disabled={stationBusy}
+                    onClick={() => removeStation(selectedStationId)}
+                  >
+                    Delete station
+                  </button>
+                  <button
+                    type="button"
+                    disabled={stationBusy}
+                    onClick={() => {
+                      clearStationSelection();
+                      setError("");
+                      setStatus("Station editing cancelled.");
+                    }}
+                  >
+                    Cancel editing
+                  </button>
+                </div>
+              )}
             </form>
             <p className="help rule-note">
               Unique locations only. New stations cannot lie on an existing
@@ -764,17 +921,23 @@ export default function App() {
                       {String(i + 1).padStart(2, "0")}
                     </span>
                     <div>
-                      <strong>{s.name}</strong>
+                      <button
+                        type="button"
+                        className="station-select"
+                        aria-label={`Edit station ${s.name}`}
+                        disabled={stationBusy}
+                        onClick={() => selectStation(s)}
+                      >
+                        {s.name}
+                      </button>
                       <span className="coordinate-text">
                         {s.x}, {s.y}
                       </span>
                     </div>
                     <button
                       aria-label={`Remove ${s.name}`}
-                      disabled={adding || planBusy || importing}
-                      onClick={() =>
-                        changeStations(stations.filter((x) => x.id !== s.id))
-                      }
+                      disabled={stationBusy}
+                      onClick={() => removeStation(s.id)}
                     >
                       Remove
                     </button>
@@ -794,6 +957,13 @@ export default function App() {
                   Query X
                   <input
                     name="x"
+                    value={queryCoordinates.x}
+                    onChange={(e) =>
+                      setQueryCoordinates((current) => ({
+                        ...current,
+                        x: e.target.value,
+                      }))
+                    }
                     type="number"
                     required
                     min="0"
@@ -806,6 +976,13 @@ export default function App() {
                   Query Y
                   <input
                     name="y"
+                    value={queryCoordinates.y}
+                    onChange={(e) =>
+                      setQueryCoordinates((current) => ({
+                        ...current,
+                        y: e.target.value,
+                      }))
+                    }
                     type="number"
                     required
                     min="0"
@@ -815,9 +992,14 @@ export default function App() {
                   />
                 </label>
               </div>
-              <button disabled={querying}>
-                {querying ? "Finding…" : "Find nearest stations"}
-              </button>
+              <div className="button-row query-actions">
+                <button disabled={querying}>
+                  {querying ? "Finding…" : "Find nearest stations"}
+                </button>
+                <button type="button" onClick={resetQuery}>
+                  Reset query
+                </button>
+              </div>
             </form>
             {result && (
               <output className="query-result" aria-live="polite">
@@ -837,77 +1019,78 @@ export default function App() {
             )}
           </section>
         </aside>
-      </div>
-      <section className="plans-panel" aria-labelledby="plans-heading">
-        <div className="plan-intro">
-          <h2 id="plans-heading">Your plans</h2>
-          <p className="save-state">
-            {dirty ? "Unsaved changes" : "All changes saved"}
-          </p>
-          <p className="help">
-            {user
-              ? "Save a version, revisit a city."
-              : "Sign in to save and revisit your plans."}
-          </p>
-        </div>
-        <div className="plan-controls">
-          <label>
-            Plan name
-            <input
-              value={name}
-              maxLength="100"
-              onChange={(e) => setName(e.target.value)}
-              placeholder="Give this city a name"
-            />
-          </label>
-          <div className="button-row">
+        <section className="plans-panel" aria-labelledby="plans-heading">
+          <div className="plan-intro">
+            <h2 id="plans-heading">Your plans</h2>
+            <p className="save-state">
+              {dirty ? "Unsaved changes" : "All changes saved"}
+            </p>
+            <p className="help">
+              {user
+                ? "Save a version, revisit a city."
+                : "Sign in to save and revisit your plans."}
+            </p>
+          </div>
+          <div className="plan-controls">
+            <label>
+              Plan name
+              <input
+                value={name}
+                maxLength="100"
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Give this city a name"
+              />
+            </label>
+            <div className="button-row">
+              <button
+                className="primary"
+                disabled={planBusy || authBusy || adding || importing}
+                onClick={() => save()}
+              >
+                Save plan
+              </button>
+              <button
+                disabled={
+                  !planId || planBusy || authBusy || adding || importing
+                }
+                onClick={() => save(true)}
+              >
+                Save as new
+              </button>
+              <button
+                disabled={planBusy || adding || importing}
+                onClick={newPlan}
+              >
+                New plan
+              </button>
+            </div>
+          </div>
+          <div className="plan-controls">
+            <label>
+              Saved plans
+              <select
+                value={selection}
+                onChange={(e) => setSelection(e.target.value)}
+              >
+                <option value="">Choose a plan</option>
+                {plans.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.name}
+                  </option>
+                ))}
+              </select>
+            </label>
             <button
-              className="primary"
-              disabled={planBusy || authBusy || adding || importing}
-              onClick={() => save()}
+              disabled={!selection || planBusy || adding || importing}
+              onClick={load}
             >
-              Save plan
-            </button>
-            <button
-              disabled={!planId || planBusy || authBusy || adding || importing}
-              onClick={() => save(true)}
-            >
-              Save as new
-            </button>
-            <button
-              disabled={planBusy || adding || importing}
-              onClick={newPlan}
-            >
-              New plan
+              Load plan
             </button>
           </div>
-        </div>
-        <div className="plan-controls">
-          <label>
-            Saved plans
-            <select
-              value={selection}
-              onChange={(e) => setSelection(e.target.value)}
-            >
-              <option value="">Choose a plan</option>
-              {plans.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <button
-            disabled={!selection || planBusy || adding || importing}
-            onClick={load}
-          >
-            Load plan
-          </button>
-        </div>
-      </section>
+        </section>
+      </div>
       <footer>
         <span>The Polling Atlas</span>
-        <span>Clear boundaries. Closer communities.</span>
       </footer>
       {authOpen && (
         <AccountDialog

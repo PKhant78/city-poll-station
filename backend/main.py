@@ -17,6 +17,7 @@ from sqlalchemy.exc import IntegrityError
 from security import verify_password
 from schemas import StationSet, Query, PlanInput
 from database import Plan
+from plan_names import ensure_unique_plan_name
 from datetime import datetime, timezone
 from geometry import districts, nearest
 
@@ -141,6 +142,7 @@ def create_app(database_url=None):
 
     @application.post('/api/plans', status_code=201)
     def create_plan(body: PlanInput, user=Depends(current_user), db=Depends(get_db)):
+        ensure_unique_plan_name(db, user.id, body.name)
         plan = Plan(user_id=user.id, name=body.name, stations=body.points(), show_districts=body.show_districts)
         db.add(plan)
         db.commit()
@@ -155,6 +157,7 @@ def create_app(database_url=None):
     @application.put('/api/plans/{plan_id}')
     def update_plan(plan_id: str, body: PlanInput, user=Depends(current_user), db=Depends(get_db)):
         plan = owned_plan(plan_id, user, db)
+        ensure_unique_plan_name(db, user.id, body.name, exclude_plan_id=plan.id)
         plan.name = body.name
         plan.stations = body.points()
         plan.show_districts = body.show_districts

@@ -73,6 +73,30 @@ select {
 input::placeholder {
   color: #8b8578;
 }
+.button-row.query-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.button-row.file-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  align-items: stretch;
+  max-width: 100%;
+}
+.file-actions > button,
+.file-actions > .csv-import {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  min-width: 0;
+  padding: 9px 12px;
+  text-align: center;
+}
+.file-actions > [role="status"] {
+  grid-column: 1 / -1;
+}
 .csv-import {
   position: relative;
   min-height: 42px;
@@ -197,8 +221,8 @@ h3 {
 }
 .workspace {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 40px;
+  grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  gap: 24px;
   align-items: start;
 }
 .section-heading {
@@ -215,9 +239,34 @@ h3 {
   color: var(--muted);
   padding-bottom: 3px;
 }
+.station-marker {
+  cursor: pointer;
+}
+.station-marker[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+.station-marker:focus-visible {
+  outline: 2px solid var(--ink);
+  outline-offset: 3px;
+}
+.station-select {
+  display: block;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  font: inherit;
+  font-weight: 600;
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.button-row.station-edit-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
 .map-frame {
   position: relative;
-  width: 100%;
+  width: min(100%, calc(var(--map-fit-size, 100%) * 2 / 3));
+  max-width: 100%;
   aspect-ratio: 1;
   border: 1px solid var(--rule);
 }
@@ -313,7 +362,8 @@ h3 {
 }
 .tools {
   border-left: 1px solid var(--rule);
-  padding-left: 30px;
+  padding-left: 20px;
+  min-width: 0;
 }
 .tool-section {
   padding-bottom: 26px;
@@ -399,15 +449,23 @@ h3 {
   margin-top: 6px;
 }
 .plans-panel {
-  margin-top: 28px;
-  border-top: 2px solid var(--ink);
-  border-bottom: 1px solid var(--ink);
-  padding: 27px 0;
+  min-width: 0;
+  border-left: 1px solid var(--rule);
+  padding-left: 20px;
   display: grid;
-  grid-template-columns: 0.8fr 1.2fr 1fr;
-  gap: 32px;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 22px;
+}
+.plans-panel .plan-controls > .button-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  width: 100%;
+}
+.plan-controls > button {
+  width: 100%;
 }
 .plan-controls {
+  min-width: 0;
   display: flex;
   flex-direction: column;
   gap: 12px;
@@ -498,12 +556,23 @@ dialog form {
   margin-top: 22px;
 }
 @media (min-width: 1400px) {
-  .workspace {
-    grid-template-columns: minmax(0, 1fr) 350px;
-    gap: 48px;
-  }
   .tools {
-    padding-left: 38px;
+    padding-left: 24px;
+  }
+}
+@media (max-width: 1100px) {
+  .map-frame {
+    width: calc(min(100%, var(--map-fit-size, 100%)) * 2 / 3);
+  }
+  .workspace {
+    grid-template-columns: minmax(0, 1fr) 280px;
+  }
+  .plans-panel {
+    grid-column: 1 / -1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    border-left: 0;
+    border-top: 2px solid var(--ink);
+    padding: 24px 0;
   }
 }
 @media (max-width: 1000px) {
