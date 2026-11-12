@@ -2,9 +2,13 @@
 
 A single-page workspace for election staff with React, JavaScript, Tailwind, Python and PostgresSQL.
 
+## Vercel deployment
+
+Configured for **one Vercel project with two services**: React/Vite plus a server-side frontend proxy, and a private FastAPI backend reached through the `BACKEND_URL` binding. See [the deployment guide](docs/VERCEL.md) for environment variables, hosted PostgreSQL initialization and verification. The configuration has been tested locally; no cloud deployment has been made.
+
 ## Local development
 
-Requirements: Node.js 22+, npm, Python 3.11+, [uv](https://docs.astral.sh/uv/), Docker with Compose.
+Requirements: Node.js 22.22+ (22.x), npm, Python 3.12 (pinned for Vercel), [uv](https://docs.astral.sh/uv/), Docker with Compose.
 
 Start PostgreSQL from the project root:
 

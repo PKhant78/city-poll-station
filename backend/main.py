@@ -5,10 +5,11 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pathlib import Path
 from contextlib import asynccontextmanager
-import os
+
 import secrets
 import time
-from database import Base, User, LoginSession, database, DEFAULT_DATABASE_URL
+from database import Base, User, LoginSession, database
+from settings import resolve_database_url, on_vercel, cookie_secure, allowed_origins as get_allowed_origins
 from security import hash_password, token_digest
 from pydantic import BaseModel, Field, field_validator
 from sqlalchemy import select
@@ -20,7 +21,7 @@ from datetime import datetime, timezone
 from geometry import districts, nearest
 
 FRONTEND_DIST = Path(__file__).resolve().parent.parent / 'frontend' / 'dist'
-DEFAULT_ALLOWED_ORIGINS = 'http://localhost:5180,http://127.0.0.1:5180,http://localhost:8000,http://127.0.0.1:8000'
+
 
 
 class Credentials(BaseModel):
@@ -38,18 +39,23 @@ class Credentials(BaseModel):
 
 
 def create_app(database_url=None):
-    engine, sessions = database(database_url or os.getenv('DATABASE_URL', DEFAULT_DATABASE_URL))
+    serverless = on_vercel()
+    secure_cookie = cookie_secure()
+    allowed_origins = get_allowed_origins()
+    engine, sessions = database(resolve_database_url(database_url))
 
     @asynccontextmanager
     async def lifespan(application):
-        Base.metadata.create_all(engine)
-        yield
-        engine.dispose()
+        try:
+            if not serverless:
+                Base.metadata.create_all(engine)
+            yield
+        finally:
+            engine.dispose()
 
     application = FastAPI(title='City Polling Plans', lifespan=lifespan)
     application.state.engine = engine
-    secure_cookie = os.getenv('COOKIE_SECURE', 'false').lower() == 'true'
-    allowed_origins = {origin.strip() for origin in os.getenv('ALLOWED_ORIGINS', DEFAULT_ALLOWED_ORIGINS).split(',') if origin.strip()}
+
 
     @application.exception_handler(RequestValidationError)
     async def validation_error(request, exc):
@@ -186,7 +192,7 @@ def create_app(database_url=None):
             raise HTTPException(422, 'A new station cannot be placed on an existing district boundary.')
         return {'valid': True}
 
-    if FRONTEND_DIST.is_dir():
+    if not serverless and FRONTEND_DIST.is_dir():
         application.mount('/', StaticFiles(directory=FRONTEND_DIST, html=True), name='frontend')
 
     return application

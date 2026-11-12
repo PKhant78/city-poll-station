@@ -2,7 +2,7 @@ import time
 import uuid
 from sqlalchemy import String, Float, ForeignKey, create_engine, JSON, Boolean
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column, sessionmaker
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import StaticPool, NullPool
 
 DEFAULT_DATABASE_URL = 'postgresql+psycopg://poll:poll@localhost:5432/poll'
 
@@ -36,10 +36,14 @@ class Plan(Base):
 
 
 def database(url):
+    from settings import normalize_database_url, on_vercel
+    url = normalize_database_url(url)
     kwargs = {'pool_pre_ping': True}
-    if url.startswith('sqlite'):
+    if on_vercel() and url.get_backend_name() == 'postgresql':
+        kwargs['poolclass'] = NullPool
+    if url.get_backend_name() == 'sqlite':
         kwargs['connect_args'] = {'check_same_thread': False}
-        if ':memory:' in url:
+        if url.database in {None, '', ':memory:'}:
             kwargs['poolclass'] = StaticPool
     engine = create_engine(url, **kwargs)
     return engine, sessionmaker(engine, expire_on_commit=False)

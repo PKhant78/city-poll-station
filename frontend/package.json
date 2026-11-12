@@ -3,12 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "type": "module",
+  "engines": {
+    "node": "22.x"
+  },
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:proxy": "node --test server/backendProxy.node.mjs"
   },
   "dependencies": {
+    "nitro": "3.0.261103-rc",
     "react": "^19.0.0",
     "react-dom": "^19.0.0"
   },
@@ -17,11 +22,11 @@
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.2.0",
     "@testing-library/user-event": "^14.6.1",
-    "@vitejs/plugin-react": "^4.3.4",
+    "@vitejs/plugin-react": "^6.3.0",
     "jsdom": "^26.0.0",
     "prettier": "^3.9.10",
     "tailwindcss": "^4.0.0",
-    "vite": "^6.1.0",
+    "vite": "^8.3.8",
     "vitest": "^5.1.0"
   }
 }
