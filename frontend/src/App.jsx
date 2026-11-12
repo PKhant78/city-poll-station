@@ -501,6 +501,29 @@ export default function App() {
     setError("");
     setStatus("Plan loaded.");
   }
+  async function deletePlan() {
+    const plan = plans.find((p) => p.id === selection);
+    if (!plan || planBusy || authBusy || !user) return;
+    if (!window.confirm(`Delete saved plan "${plan.name}"? This cannot be undone. The current map will be kept.`)) return;
+    const epoch = authEpoch.current;
+    setPlanBusy(true);
+    setError("");
+    try {
+      await api(`/plans/${plan.id}`, undefined, "DELETE");
+      if (epoch !== authEpoch.current) return;
+      setPlans((current) => current.filter((p) => p.id !== plan.id));
+      setSelection("");
+      if (planId === plan.id) {
+        setPlanId(null);
+        setSaved(null);
+      }
+      setStatus("Saved plan deleted. Current map kept.");
+    } catch (e) {
+      if (epoch === authEpoch.current) setError(e.message);
+    } finally {
+      setPlanBusy(false);
+    }
+  }
   function newPlan() {
     if (!canDiscard()) return;
     changeStations([]);
@@ -1085,6 +1108,12 @@ export default function App() {
               onClick={load}
             >
               Load plan
+            </button>
+            <button
+              disabled={!user || !selection || planBusy || authBusy || adding || importing}
+              onClick={deletePlan}
+            >
+              Delete plan
             </button>
           </div>
         </section>
